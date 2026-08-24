@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Arbetsdagar">
+<link rel="apple-touch-icon" href="appicon.png">
+<link rel="icon" type="image/png" href="appicon.png">
 <meta name="theme-color" id="themeColorMeta" content="#CAE8E8">
 <title>Arbetsdagar — Borås / Göteborg</title>
 <script>
@@ -270,9 +272,12 @@
 </div>
 
 <script>
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.6.2";
 const DATA_SCHEMA_VERSION = 2;
 const CHANGELOG = [
+  { version:"1.6.2", date:"2026-08-24", changes:[
+    "Lagt till appikon (appicon.png) för hemskärmen och webbläsarfliken"
+  ]},
   { version:"1.6.1", date:"2026-08-24", changes:[
     "Fix: bakgrunden blev inte mörk i mörkt läge (Safari målar overscroll-ytan efter color-scheme, inte bara CSS-bakgrunden)",
     "Temat sätts nu innan sidan ritas upp, så det aldrig blinkar ljust vid start"
