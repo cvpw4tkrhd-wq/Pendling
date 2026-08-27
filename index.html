@@ -6,8 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Arbetsdagar">
-<link rel="apple-touch-icon" href="appicon.png">
-<link rel="icon" type="image/png" href="appicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="appicon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="appicon-32.png">
 <meta name="theme-color" id="themeColorMeta" content="#CAE8E8">
 <title>Arbetsdagar — Borås / Göteborg</title>
 <script>
@@ -201,6 +201,26 @@
   .change-entry .v{font-weight:800;font-size:0.9rem;}
   .change-entry .d{color:var(--ink-soft);font-size:0.72rem;margin-bottom:4px;}
   .change-entry ul{margin:4px 0 0;padding-left:18px;font-size:0.83rem;line-height:1.5;}
+
+  .field-label{display:block;font-size:0.78rem;color:var(--ink-soft);margin:14px 0 5px;font-weight:600;}
+  .text-input{
+    width:100%;border:1px solid var(--line);border-radius:12px;background:var(--card);
+    color:var(--ink);padding:11px 12px;font-size:0.9rem;font-family:inherit;
+  }
+  .text-input:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .checkbox-label{
+    display:flex;align-items:center;gap:8px;margin-top:14px;font-size:0.82rem;color:var(--ink-soft);
+  }
+  .checkbox-label input{width:16px;height:16px;flex:none;}
+  .sync-actions{display:flex;gap:10px;margin-top:18px;}
+  .sync-actions button{
+    flex:1;border:1px solid var(--card-border);border-radius:14px;padding:12px 10px;font-size:0.85rem;font-weight:700;
+    box-shadow:var(--shadow);background:var(--card);color:var(--ink);
+  }
+  .sync-actions button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;}
+  .sync-status{margin:14px 0 0;font-size:0.78rem;color:var(--ink-soft);min-height:1.2em;}
+  .sync-status.error{color:var(--boras);}
+  .sync-status.ok{color:var(--goteborg);}
 </style>
 </head>
 <body>
@@ -211,6 +231,7 @@
     <p class="sub">Borås-kontor · Göteborg-kontor</p>
   </div>
   <div class="headerbtns">
+    <button class="iconbtn" id="syncBtn" aria-label="Synk-inställningar">☁</button>
     <button class="iconbtn" id="themeBtn" aria-label="Byt tema">◐</button>
   </div>
 </header>
@@ -248,9 +269,10 @@
   <span id="versionTag"></span>
   <button id="historyBtn">Historik</button>
   <button id="changelogBtn">Ändringslogg</button>
+  <button id="syncFooterBtn">Synk</button>
 </div>
 
-<p class="note">Tryck på en dag för att växla Borås → Göteborg → Ej markerat. Lördag och söndag har en egen ton, och helgdagar (allmänna helgdagar, julafton, nyårsafton) syns i en mörkare ton med en liten prick i hörnet — håll inne dagen för att se namnet. Data sparas automatiskt på enheten, och varje ändring loggas i Historik så du kan återställa ett tidigare läge. Använd <b>Spara till fil</b> och välj iCloud Drive för att spara en kopia där.</p>
+<p class="note">Tryck på en dag för att växla Borås → Göteborg → Ej markerat. Lördag och söndag har en egen ton, och helgdagar (allmänna helgdagar, julafton, nyårsafton) syns i en mörkare ton med en liten prick i hörnet — håll inne dagen för att se namnet. Data sparas automatiskt på enheten och synkas automatiskt mellan dina enheter via JSONBin — inget att ställa in. Använd <b>Spara till fil</b> för en extra manuell kopia i iCloud Drive vid behov.</p>
 
 <div class="toast" id="toast"></div>
 
@@ -271,10 +293,46 @@
   </div>
 </div>
 
+<div class="sheet-overlay" id="syncOverlay">
+  <div class="sheet">
+    <button class="close" id="syncClose">✕</button>
+    <h2>Synk via JSONBin</h2>
+    <p class="sub" style="margin:0 0 14px;">Synken är redan inbyggd och aktiv i appen — inget att ställa in. Fälten nedan är bara om du vill peka om till en annan bin.</p>
+    <label class="field-label" for="syncBinId">Bin-ID</label>
+    <input type="text" id="syncBinId" class="text-input" placeholder="t.ex. 65f2a1...">
+    <label class="field-label" for="syncApiKey">API-nyckel</label>
+    <input type="password" id="syncApiKey" class="text-input" placeholder="Master Key eller Access Key">
+    <label class="checkbox-label">
+      <input type="checkbox" id="syncIsAccessKey">
+      Det här är en begränsad Access Key (inte Master Key)
+    </label>
+    <div class="sync-actions">
+      <button id="syncSaveBtn" class="primary">Spara & synka</button>
+      <button id="syncForgetBtn">Koppla bort</button>
+    </div>
+    <p class="sync-status" id="syncStatus"></p>
+  </div>
+</div>
+
 <script>
-const APP_VERSION = "1.6.3";
+const APP_VERSION = "1.7.2";
 const DATA_SCHEMA_VERSION = 2;
 const CHANGELOG = [
+  { version:"1.7.2", date:"2026-08-25", changes:[
+    "Fix: fel API-nyckel var inbyggd (samma som budgetappens bin) — rättad till rätt nyckel för denna bin"
+  ]},
+  { version:"1.7.1", date:"2026-08-25", changes:[
+    "Synk-uppgifterna (bin-ID och nyckel) är nu inbyggda i appen — ingen manuell inställning krävs längre",
+    "Synk-panelen kan fortfarande användas för att peka om till en annan bin vid behov"
+  ]},
+  { version:"1.7.0", date:"2026-08-24", changes:[
+    "Automatisk synk mellan enheter via JSONBin (☁-ikonen i headern eller Synk i sidfoten)",
+    "Data skickas automatiskt vid varje ändring, och hämtas vid start om det finns nyare data",
+    "Nyckel och Bin-ID sparas bara lokalt i webbläsaren, aldrig i själva filen"
+  ]},
+  { version:"1.6.4", date:"2026-08-24", changes:[
+    "Ikonen finns nu i två storlekar: 180×180 för hemskärmen, 32×32 som webbläsarikon"
+  ]},
   { version:"1.6.3", date:"2026-08-24", changes:[
     "Fix: innehållet skymdes av statusfältet (klocka/batteri) när appen körs fristående från hemskärmen",
     "Lade till marginal för safe-area överst, styrs av telefonens hörn/notch"
@@ -327,6 +385,10 @@ const LABELS = { none:"Ej markerat", boras:"Borås", goteborg:"Göteborg" };
 const STORE_KEY = "arbetsdagar-data-v1";
 const HISTORY_KEY = "arbetsdagar-history-v1";
 const THEME_KEY = "arbetsdagar-theme";
+const UPDATED_AT_KEY = "arbetsdagar-updated-at";
+const SYNC_BINID_KEY = "arbetsdagar-sync-binid";
+const SYNC_APIKEY_KEY = "arbetsdagar-sync-apikey";
+const SYNC_KEYTYPE_KEY = "arbetsdagar-sync-keytype";
 const MAX_HISTORY = 30;
 
 let data = {};
@@ -419,6 +481,7 @@ function isToday(d){
 }
 function save(changeDescription){
   localStorage.setItem(STORE_KEY, JSON.stringify(data));
+  localStorage.setItem(UPDATED_AT_KEY, new Date().toISOString());
   history.unshift({
     at: new Date().toISOString(),
     change: changeDescription,
@@ -426,6 +489,7 @@ function save(changeDescription){
   });
   if(history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  scheduleSyncPush();
 }
 function showToast(msg){
   toastEl.textContent = msg;
@@ -433,6 +497,127 @@ function showToast(msg){
   clearTimeout(showToast._t);
   showToast._t = setTimeout(()=>toastEl.classList.remove("show"), 2200);
 }
+
+// --- Synk via JSONBin ---
+// Inbyggd synk-konfiguration för Arbetsdagar-binen (separat från andra appars binar).
+const DEFAULT_SYNC = {
+  binId: "6a8ff7cdf5f4af5e2948a8ec",
+  apiKey: "$2a$10$sJEFkeUVii6R.cbwhsrlV.MjsDZMTcIJzlLMkPN7L67tDcVHFcLL6",
+  keyType: "access"
+};
+function getSyncConfig(){
+  const binId = localStorage.getItem(SYNC_BINID_KEY) || DEFAULT_SYNC.binId;
+  const apiKey = localStorage.getItem(SYNC_APIKEY_KEY) || DEFAULT_SYNC.apiKey;
+  const keyType = localStorage.getItem(SYNC_KEYTYPE_KEY) || DEFAULT_SYNC.keyType;
+  if(!binId || !apiKey) return null;
+  return { binId, apiKey, keyType };
+}
+function syncAuthHeader(cfg){
+  return cfg.keyType === "access" ? "X-Access-Key" : "X-Master-Key";
+}
+function setSyncStatus(msg, kind){
+  const el = document.getElementById("syncStatus");
+  if(!el) return;
+  el.textContent = msg;
+  el.className = "sync-status" + (kind ? " " + kind : "");
+}
+let syncPushTimer = null;
+function scheduleSyncPush(){
+  const cfg = getSyncConfig();
+  if(!cfg) return;
+  clearTimeout(syncPushTimer);
+  syncPushTimer = setTimeout(() => { syncPush().catch(()=>{}); }, 900);
+}
+async function syncPush(){
+  const cfg = getSyncConfig();
+  if(!cfg) throw new Error("Synk är inte konfigurerad");
+  const updatedAt = localStorage.getItem(UPDATED_AT_KEY) || new Date().toISOString();
+  const body = { days: data, updatedAt, appVersion: APP_VERSION };
+  const res = await fetch(`https://api.jsonbin.io/v3/b/${cfg.binId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      [syncAuthHeader(cfg)]: cfg.apiKey
+    },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error("Kunde inte skicka till JSONBin (" + res.status + ")");
+  setSyncStatus("Synkad " + new Date().toLocaleTimeString("sv-SE", {hour:"2-digit", minute:"2-digit"}), "ok");
+  return true;
+}
+async function syncPull(){
+  const cfg = getSyncConfig();
+  if(!cfg) throw new Error("Synk är inte konfigurerad");
+  const res = await fetch(`https://api.jsonbin.io/v3/b/${cfg.binId}/latest`, {
+    headers: { [syncAuthHeader(cfg)]: cfg.apiKey }
+  });
+  if(!res.ok) throw new Error("Kunde inte hämta från JSONBin (" + res.status + ")");
+  const json = await res.json();
+  return json && json.record ? json.record : null;
+}
+async function syncReconcile(){
+  const cfg = getSyncConfig();
+  if(!cfg) return;
+  setSyncStatus("Synkar…");
+  try {
+    const remote = await syncPull();
+    const localUpdatedAt = localStorage.getItem(UPDATED_AT_KEY);
+    if(remote && remote.days && remote.updatedAt && (!localUpdatedAt || remote.updatedAt > localUpdatedAt)){
+      data = remote.days;
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+      localStorage.setItem(UPDATED_AT_KEY, remote.updatedAt);
+      save("Synkad från JSONBin");
+      clearTimeout(syncPushTimer);
+      render();
+      setSyncStatus("Hämtade senaste data " + new Date().toLocaleTimeString("sv-SE", {hour:"2-digit", minute:"2-digit"}), "ok");
+    } else {
+      await syncPush();
+    }
+  } catch(err){
+    setSyncStatus(err.message, "error");
+  }
+}
+function fillSyncForm(){
+  const cfg = getSyncConfig();
+  document.getElementById("syncBinId").value = cfg ? cfg.binId : "";
+  document.getElementById("syncApiKey").value = cfg ? cfg.apiKey : "";
+  document.getElementById("syncIsAccessKey").checked = cfg ? cfg.keyType === "access" : false;
+  setSyncStatus(cfg ? "Ansluten till bin " + cfg.binId : "Inte konfigurerad ännu.");
+}
+document.getElementById("syncBtn").addEventListener("click", () => {
+  fillSyncForm();
+  document.getElementById("syncOverlay").classList.add("show");
+});
+document.getElementById("syncFooterBtn").addEventListener("click", () => {
+  fillSyncForm();
+  document.getElementById("syncOverlay").classList.add("show");
+});
+document.getElementById("syncClose").addEventListener("click", () => {
+  document.getElementById("syncOverlay").classList.remove("show");
+});
+document.getElementById("syncOverlay").addEventListener("click", (e) => {
+  if(e.target.id === "syncOverlay") e.target.classList.remove("show");
+});
+document.getElementById("syncSaveBtn").addEventListener("click", async () => {
+  const binId = document.getElementById("syncBinId").value.trim();
+  const apiKey = document.getElementById("syncApiKey").value.trim();
+  const isAccess = document.getElementById("syncIsAccessKey").checked;
+  if(!binId || !apiKey){
+    setSyncStatus("Fyll i både Bin-ID och API-nyckel.", "error");
+    return;
+  }
+  localStorage.setItem(SYNC_BINID_KEY, binId);
+  localStorage.setItem(SYNC_APIKEY_KEY, apiKey);
+  localStorage.setItem(SYNC_KEYTYPE_KEY, isAccess ? "access" : "master");
+  await syncReconcile();
+});
+document.getElementById("syncForgetBtn").addEventListener("click", () => {
+  localStorage.removeItem(SYNC_BINID_KEY);
+  localStorage.removeItem(SYNC_APIKEY_KEY);
+  localStorage.removeItem(SYNC_KEYTYPE_KEY);
+  fillSyncForm();
+  showToast("Synk bortkopplad");
+});
 
 // --- Theme ---
 function applyTheme(mode){
@@ -624,6 +809,7 @@ document.getElementById("changelogOverlay").addEventListener("click", (e) => {
 document.getElementById("versionTag").textContent = "v" + APP_VERSION;
 
 render();
+if(getSyncConfig()) syncReconcile();
 </script>
 </body>
 </html>
